@@ -1,0 +1,22 @@
+stages:
+  - Pre-Build
+  - Build
+  - Post-Build
+
+include:
+  - project: gitlab/gitlabci-template
+    file: pre-build/.pre-build-common-template.yml
+    ref: migrate-to-sonarqube-ee
+  - project: gitlab/gitlabci-template
+    file: build/.build-docker-common-template.yml
+    ref: master
+  - project: gitlab/gitlabci-template
+    file: post-build/.post-build-common-template.yml
+    ref: master
+
+SonarQube:
+  stage: Pre-Build
+
+Build:
+  variables:
+    CUSTOM_TAG: $CI_COMMIT_REF_NAME
