@@ -47,6 +47,7 @@ func (c *Controller) finalize(old interface{}) error {
 		if err := canaryController.SetStatusPhase(canary, flaggerv1.CanaryPhaseTerminating); err != nil {
 			return fmt.Errorf("failed to update status: %w", err)
 		}
+		c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseTerminating)
 
 		// record event
 		c.recordEventInfof(canary, "Terminating canary %s.%s", canary.Name, canary.Namespace)

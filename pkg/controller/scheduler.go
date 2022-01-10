@@ -237,6 +237,7 @@ func (c *Controller) advanceCanary(name string, namespace string) {
 
 	if !shouldAdvance {
 		c.recorder.SetStatus(cd, cd.Status.Phase)
+		c.recorder.SetPhase(cd, cd.Status.Phase)
 		return
 	}
 
@@ -292,6 +293,7 @@ func (c *Controller) advanceCanary(name string, namespace string) {
 		if err := canaryController.SyncStatus(cd, status); err != nil {
 			c.recordEventWarningf(cd, "%v", err)
 		}
+		c.recorder.SetPhase(cd, flaggerv1.CanaryPhaseFailed)
 		return
 	}
 
@@ -339,6 +341,7 @@ func (c *Controller) advanceCanary(name string, namespace string) {
 			return
 		}
 		c.recorder.SetStatus(cd, flaggerv1.CanaryPhaseSucceeded)
+		c.recorder.SetPhase(cd, flaggerv1.CanaryPhaseSucceeded)
 		c.runPostRolloutHooks(cd, flaggerv1.CanaryPhaseSucceeded)
 		c.recordEventInfof(cd, "Promotion completed! Scaling down %s.%s", cd.Spec.TargetRef.Name, cd.Namespace)
 		c.alert(cd, "Canary analysis completed successfully, promotion finished.",
@@ -431,6 +434,7 @@ func (c *Controller) runPromotionTrafficShift(canary *flaggerv1.Canary, canaryCo
 		if err := canaryController.SetStatusPhase(canary, flaggerv1.CanaryPhaseFinalising); err != nil {
 			c.recordEventWarningf(canary, "%v", err)
 		}
+		c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseFinalising)
 		return
 	}
 
@@ -445,6 +449,7 @@ func (c *Controller) runPromotionTrafficShift(canary *flaggerv1.Canary, canaryCo
 		if err := canaryController.SetStatusPhase(canary, flaggerv1.CanaryPhaseFinalising); err != nil {
 			c.recordEventWarningf(canary, "%v", err)
 		}
+		c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseFinalising)
 		return
 	}
 
@@ -470,6 +475,7 @@ func (c *Controller) runPromotionTrafficShift(canary *flaggerv1.Canary, canaryCo
 			if err := canaryController.SetStatusPhase(canary, flaggerv1.CanaryPhaseFinalising); err != nil {
 				c.recordEventWarningf(canary, "%v", err)
 			}
+			c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseFinalising)
 		} else {
 			if err := canaryController.SetStatusWeight(canary, canaryWeight); err != nil {
 				c.recordEventWarningf(canary, "%v", err)
@@ -552,6 +558,7 @@ func (c *Controller) runCanary(canary *flaggerv1.Canary, canaryController canary
 			c.recordEventWarningf(canary, "%v", err)
 			return
 		}
+		c.recorder.SetPhase(canary, flaggerv1.CanaryPhasePromoting)
 	}
 }
 
@@ -595,6 +602,7 @@ func (c *Controller) runAB(canary *flaggerv1.Canary, canaryController canary.Con
 			c.recordEventWarningf(canary, "%v", err)
 			return
 		}
+		c.recorder.SetPhase(canary, flaggerv1.CanaryPhasePromoting)
 	}
 }
 
@@ -664,6 +672,7 @@ func (c *Controller) runBlueGreen(canary *flaggerv1.Canary, canaryController can
 			c.recordEventWarningf(canary, "%v", err)
 			return
 		}
+		c.recorder.SetPhase(canary, flaggerv1.CanaryPhasePromoting)
 	}
 
 }
@@ -739,6 +748,7 @@ func (c *Controller) shouldSkipAnalysis(canary *flaggerv1.Canary, canaryControll
 
 	// notify
 	c.recorder.SetStatus(canary, flaggerv1.CanaryPhaseSucceeded)
+	c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseSucceeded)
 	c.recordEventInfof(canary, "Promotion completed! Canary analysis was skipped for %s.%s",
 		canary.Spec.TargetRef.Name, canary.Namespace)
 	c.alert(canary, "Canary analysis was skipped, promotion finished.",
@@ -777,6 +787,7 @@ func (c *Controller) shouldAdvance(canary *flaggerv1.Canary, canaryController ca
 
 func (c *Controller) checkCanaryStatus(canary *flaggerv1.Canary, canaryController canary.Controller, shouldAdvance bool) bool {
 	c.recorder.SetStatus(canary, canary.Status.Phase)
+	c.recorder.SetPhase(canary, canary.Status.Phase)
 	if canary.Status.Phase == flaggerv1.CanaryPhaseProgressing ||
 		canary.Status.Phase == flaggerv1.CanaryPhaseWaitingPromotion ||
 		canary.Status.Phase == flaggerv1.CanaryPhasePromoting ||
@@ -797,6 +808,7 @@ func (c *Controller) checkCanaryStatus(canary *flaggerv1.Canary, canaryControlle
 			return false
 		}
 		c.recorder.SetStatus(canary, flaggerv1.CanaryPhaseInitialized)
+		c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseInitialized)
 		c.recordEventInfof(canary, "Initialization done! %s.%s", canary.Name, canary.Namespace)
 		c.alert(canary, fmt.Sprintf("New %s detected, initialization completed.", canary.Spec.TargetRef.Kind),
 			true, flaggerv1.SeverityInfo)
@@ -819,6 +831,7 @@ func (c *Controller) checkCanaryStatus(canary *flaggerv1.Canary, canaryControlle
 			return false
 		}
 		c.recorder.SetStatus(canary, flaggerv1.CanaryPhaseProgressing)
+		c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseProgressing)
 		return false
 	}
 	return false
@@ -873,6 +886,7 @@ func (c *Controller) rollback(canary *flaggerv1.Canary, canaryController canary.
 	}
 
 	c.recorder.SetStatus(canary, flaggerv1.CanaryPhaseFailed)
+	c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseFailed)
 	c.runPostRolloutHooks(canary, flaggerv1.CanaryPhaseFailed)
 }
 

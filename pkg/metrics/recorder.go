@@ -30,6 +30,7 @@ type Recorder struct {
 	duration *prometheus.HistogramVec
 	total    *prometheus.GaugeVec
 	status   *prometheus.GaugeVec
+	phase    *prometheus.GaugeVec
 	weight   *prometheus.GaugeVec
 }
 
@@ -61,6 +62,13 @@ func NewRecorder(controller string, register bool) Recorder {
 		Help:      "Last canary analysis result",
 	}, []string{"name", "namespace"})
 
+	// see pkg/apis/flagger/v1beta1/status.go
+	phase := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: controller,
+		Name:      "canary_phase",
+		Help:      "Condition of a canary at the current time",
+	}, []string{"name", "namespace"})
+
 	weight := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Subsystem: controller,
 		Name:      "canary_weight",
@@ -72,6 +80,7 @@ func NewRecorder(controller string, register bool) Recorder {
 		prometheus.MustRegister(duration)
 		prometheus.MustRegister(total)
 		prometheus.MustRegister(status)
+		prometheus.MustRegister(phase)
 		prometheus.MustRegister(weight)
 	}
 
@@ -80,6 +89,7 @@ func NewRecorder(controller string, register bool) Recorder {
 		duration: duration,
 		total:    total,
 		status:   status,
+		phase:    phase,
 		weight:   weight,
 	}
 }
@@ -111,6 +121,52 @@ func (cr *Recorder) SetStatus(cd *flaggerv1.Canary, phase flaggerv1.CanaryPhase)
 		status = 1
 	}
 	cr.status.WithLabelValues(cd.Spec.TargetRef.Name, cd.Namespace).Set(float64(status))
+}
+
+// SetPhase sets the last known condition of a canary at the current time
+func (cr *Recorder) SetPhase(cd *flaggerv1.Canary, phase flaggerv1.CanaryPhase) {
+	type CanaryPhase int
+	const (
+		Initializing     CanaryPhase = iota //0
+		Initialized                         //1
+		Waiting                             //2
+		Progressing                         //3
+		WaitingPromotion                    //4
+		Promoting                           //5
+		Finalising                          //6
+		Succeeded                           //7
+		Failed                              //8
+		Terminating                         //9
+		Terminated                          //10
+	)
+	var canaryPhase CanaryPhase
+	switch phase {
+	case flaggerv1.CanaryPhaseInitializing:
+		canaryPhase = Initializing
+	case flaggerv1.CanaryPhaseInitialized:
+		canaryPhase = Initialized
+	case flaggerv1.CanaryPhaseWaiting:
+		canaryPhase = Waiting
+	case flaggerv1.CanaryPhaseProgressing:
+		canaryPhase = Progressing
+	case flaggerv1.CanaryPhaseWaitingPromotion:
+		canaryPhase = WaitingPromotion
+	case flaggerv1.CanaryPhasePromoting:
+		canaryPhase = Promoting
+	case flaggerv1.CanaryPhaseFinalising:
+		canaryPhase = Finalising
+	case flaggerv1.CanaryPhaseSucceeded:
+		canaryPhase = Succeeded
+	case flaggerv1.CanaryPhaseFailed:
+		canaryPhase = Failed
+	case flaggerv1.CanaryPhaseTerminating:
+		canaryPhase = Terminating
+	case flaggerv1.CanaryPhaseTerminated:
+		canaryPhase = Terminated
+	default:
+		canaryPhase = Progressing
+	}
+	cr.phase.WithLabelValues(cd.Spec.TargetRef.Name, cd.Namespace).Set(float64(canaryPhase))
 }
 
 // SetWeight sets the weight values for primary and canary destinations
