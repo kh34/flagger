@@ -107,9 +107,13 @@ func (c *Controller) runConfirmPromotionHooks(canary *flaggerv1.Canary, canaryCo
 func (c *Controller) runPreRolloutHooks(canary *flaggerv1.Canary) bool {
 	for _, webhook := range canary.GetAnalysis().Webhooks {
 		if webhook.Type == flaggerv1.PreRolloutHook {
+			if canary.Status.CanaryWeight == 0 && canary.Status.Iterations == 0 {
+				c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseWaiting)
+			} else {
+				c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseProgressing)
+			}
 			err := CallWebhook(canary.Name, canary.Namespace, flaggerv1.CanaryPhaseProgressing, webhook)
 			if err != nil {
-				c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseProgressing)
 				c.recordEventWarningf(canary, "Halt %s.%s advancement pre-rollout check %s failed %v",
 					canary.Name, canary.Namespace, webhook.Name, err)
 				return false
