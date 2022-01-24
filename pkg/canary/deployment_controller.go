@@ -131,7 +131,8 @@ func (c *DeploymentController) Promote(cd *flaggerv1.Canary) error {
 
 		// update deploy annotations
 		primaryCopy.ObjectMeta.Annotations = make(map[string]string)
-		for k, v := range canary.ObjectMeta.Annotations {
+		filteredAnnotations := includeLabelsByPrefix(canary.ObjectMeta.Annotations, c.includeLabelPrefix)
+		for k, v := range filteredAnnotations {
 			primaryCopy.ObjectMeta.Annotations[k] = v
 		}
 		// update deploy labels
@@ -398,7 +399,8 @@ func (c *DeploymentController) reconcilePrimaryHpa(cd *flaggerv1.Canary, init bo
 
 				// update hpa annotations
 				hpaClone.ObjectMeta.Annotations = make(map[string]string)
-				for k, v := range hpa.ObjectMeta.Annotations {
+				filteredAnnotations := includeLabelsByPrefix(hpa.ObjectMeta.Annotations, c.includeLabelPrefix)
+				for k, v := range filteredAnnotations {
 					hpaClone.ObjectMeta.Annotations[k] = v
 				}
 				// update hpa labels

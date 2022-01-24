@@ -34,9 +34,10 @@ import (
 
 // ServiceController is managing the operations for Kubernetes service kind
 type ServiceController struct {
-	kubeClient    kubernetes.Interface
-	flaggerClient clientset.Interface
-	logger        *zap.SugaredLogger
+	kubeClient         kubernetes.Interface
+	flaggerClient      clientset.Interface
+	logger             *zap.SugaredLogger
+	includeLabelPrefix []string
 }
 
 // SetStatusFailedChecks updates the canary failed checks counter
@@ -193,12 +194,13 @@ func (c *ServiceController) Promote(cd *flaggerv1.Canary) error {
 
 		// update service annotations
 		primaryCopy.ObjectMeta.Annotations = make(map[string]string)
-		for k, v := range canary.ObjectMeta.Annotations {
+		filteredAnnotations := includeLabelsByPrefix(canary.ObjectMeta.Annotations, c.includeLabelPrefix)
+		for k, v := range filteredAnnotations {
 			primaryCopy.ObjectMeta.Annotations[k] = v
 		}
 		// update service labels
 		primaryCopy.ObjectMeta.Labels = make(map[string]string)
-		filteredLabels := includeLabelsByPrefix(canary.ObjectMeta.Labels, []string{"*"})
+		filteredLabels := includeLabelsByPrefix(canary.ObjectMeta.Labels, c.includeLabelPrefix)
 		for k, v := range filteredLabels {
 			primaryCopy.ObjectMeta.Labels[k] = v
 		}

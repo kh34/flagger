@@ -168,12 +168,13 @@ func (c *DaemonSetController) Promote(cd *flaggerv1.Canary) error {
 		primaryCopy.Spec.Template.Annotations = annotations
 		primaryCopy.Spec.Template.Labels = makePrimaryLabels(canary.Spec.Template.Labels, primaryLabelValue, label)
 
-		// update deploy annotations
+		// update ds annotations
 		primaryCopy.ObjectMeta.Annotations = make(map[string]string)
-		for k, v := range canary.ObjectMeta.Annotations {
+		filteredAnnotations := includeLabelsByPrefix(canary.ObjectMeta.Annotations, c.includeLabelPrefix)
+		for k, v := range filteredAnnotations {
 			primaryCopy.ObjectMeta.Annotations[k] = v
 		}
-		// update deploy labels
+		// update ds labels
 		primaryCopy.ObjectMeta.Labels = make(map[string]string)
 		filteredLabels := includeLabelsByPrefix(canary.ObjectMeta.Labels, c.includeLabelPrefix)
 		for k, v := range filteredLabels {
