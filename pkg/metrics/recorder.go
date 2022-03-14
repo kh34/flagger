@@ -26,13 +26,23 @@ import (
 
 // Recorder records the canary analysis as Prometheus metrics
 type Recorder struct {
-	info     *prometheus.GaugeVec
-	duration *prometheus.HistogramVec
-	total    *prometheus.GaugeVec
-	status   *prometheus.GaugeVec
-	phase    *prometheus.GaugeVec
-	weight   *prometheus.GaugeVec
+	info                          *prometheus.GaugeVec
+	duration                      *prometheus.HistogramVec
+	total                         *prometheus.GaugeVec
+	status                        *prometheus.GaugeVec
+	phase                         *prometheus.GaugeVec
+	webhookConfirmRollout         *prometheus.GaugeVec
+	webhookConfirmTrafficIncrease *prometheus.GaugeVec
+	webhookConfirmPromotion       *prometheus.GaugeVec
+	weight                        *prometheus.GaugeVec
 }
+
+type WebhookStatus int
+
+const (
+	WebhookStatusSuccess WebhookStatus = iota //0
+	WebhookStatusFailed
+)
 
 // NewRecorder creates a new recorder and registers the Prometheus metrics
 func NewRecorder(controller string, register bool) Recorder {
@@ -69,6 +79,24 @@ func NewRecorder(controller string, register bool) Recorder {
 		Help:      "Condition of a canary at the current time",
 	}, []string{"name", "namespace"})
 
+	webhookConfirmRollout := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: controller,
+		Name:      "canary_webhook_confirm_rollout",
+		Help:      "greater than 0 if confirm_rollout webhook failed",
+	}, []string{"name", "namespace"})
+
+	webhookConfirmTrafficIncrease := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: controller,
+		Name:      "canary_webhook_confirm_traffic_increase",
+		Help:      "greater than 0 if confirm_traffic_increase webhook failed",
+	}, []string{"name", "namespace"})
+
+	webhookConfirmPromotion := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: controller,
+		Name:      "canary_webhook_confirm_promotion",
+		Help:      "greater than 0 if confirm_promotion webhook failed",
+	}, []string{"name", "namespace"})
+
 	weight := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Subsystem: controller,
 		Name:      "canary_weight",
@@ -81,16 +109,22 @@ func NewRecorder(controller string, register bool) Recorder {
 		prometheus.MustRegister(total)
 		prometheus.MustRegister(status)
 		prometheus.MustRegister(phase)
+		prometheus.MustRegister(webhookConfirmRollout)
+		prometheus.MustRegister(webhookConfirmTrafficIncrease)
+		prometheus.MustRegister(webhookConfirmPromotion)
 		prometheus.MustRegister(weight)
 	}
 
 	return Recorder{
-		info:     info,
-		duration: duration,
-		total:    total,
-		status:   status,
-		phase:    phase,
-		weight:   weight,
+		info:                          info,
+		duration:                      duration,
+		total:                         total,
+		status:                        status,
+		phase:                         phase,
+		webhookConfirmRollout:         webhookConfirmRollout,
+		webhookConfirmTrafficIncrease: webhookConfirmTrafficIncrease,
+		webhookConfirmPromotion:       webhookConfirmPromotion,
+		weight:                        weight,
 	}
 }
 
@@ -121,6 +155,21 @@ func (cr *Recorder) SetStatus(cd *flaggerv1.Canary, phase flaggerv1.CanaryPhase)
 		status = 1
 	}
 	cr.status.WithLabelValues(cd.Spec.TargetRef.Name, cd.Namespace).Set(float64(status))
+}
+
+//  sets the webhook status
+func (cr *Recorder) SetWebhookConfirmTrafficIncrease(cd *flaggerv1.Canary, status WebhookStatus) {
+	cr.webhookConfirmTrafficIncrease.WithLabelValues(cd.Spec.TargetRef.Name, cd.Namespace).Set(float64(status))
+}
+
+//  sets the webhook status
+func (cr *Recorder) SetWebhookConfirmRollout(cd *flaggerv1.Canary, status WebhookStatus) {
+	cr.webhookConfirmRollout.WithLabelValues(cd.Spec.TargetRef.Name, cd.Namespace).Set(float64(status))
+}
+
+//  sets the webhook status
+func (cr *Recorder) SetWebhookConfirmPromotion(cd *flaggerv1.Canary, status WebhookStatus) {
+	cr.webhookConfirmPromotion.WithLabelValues(cd.Spec.TargetRef.Name, cd.Namespace).Set(float64(status))
 }
 
 // SetPhase sets the last known condition of a canary at the current time

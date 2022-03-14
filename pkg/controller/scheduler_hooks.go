@@ -21,14 +21,16 @@ import (
 
 	flaggerv1 "github.com/fluxcd/flagger/pkg/apis/flagger/v1beta1"
 	"github.com/fluxcd/flagger/pkg/canary"
+	"github.com/fluxcd/flagger/pkg/metrics"
 )
 
 func (c *Controller) runConfirmTrafficIncreaseHooks(canary *flaggerv1.Canary) bool {
 	for _, webhook := range canary.GetAnalysis().Webhooks {
 		if webhook.Type == flaggerv1.ConfirmTrafficIncreaseHook {
-			c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseWaiting)
 			err := CallWebhook(canary.Name, canary.Namespace, flaggerv1.CanaryPhaseProgressing, webhook)
 			if err != nil {
+				c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseWaiting)
+				c.recorder.SetWebhookConfirmTrafficIncrease(canary, metrics.WebhookStatusFailed)
 				c.recordEventWarningf(canary, "Halt %s.%s advancement waiting for traffic increase approval %s",
 					canary.Name, canary.Namespace, webhook.Name)
 				if !webhook.MuteAlert {
@@ -36,6 +38,7 @@ func (c *Controller) runConfirmTrafficIncreaseHooks(canary *flaggerv1.Canary) bo
 				}
 				return false
 			}
+			c.recorder.SetWebhookConfirmTrafficIncrease(canary, metrics.WebhookStatusSuccess)
 			c.recordEventInfof(canary, "Confirm-traffic-increase check %s passed", webhook.Name)
 		}
 	}
@@ -52,6 +55,7 @@ func (c *Controller) runConfirmRolloutHooks(canary *flaggerv1.Canary, canaryCont
 						c.logger.With("canary", fmt.Sprintf("%s.%s", canary.Name, canary.Namespace)).Errorf("%v", err)
 					}
 					c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseWaiting)
+					c.recorder.SetWebhookConfirmRollout(canary, metrics.WebhookStatusFailed)
 					c.recordEventWarningf(canary, "Halt %s.%s advancement waiting for approval %s",
 						canary.Name, canary.Namespace, webhook.Name)
 					if !webhook.MuteAlert {
@@ -66,6 +70,7 @@ func (c *Controller) runConfirmRolloutHooks(canary *flaggerv1.Canary, canaryCont
 						return false
 					}
 					c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseProgressing)
+					c.recorder.SetWebhookConfirmRollout(canary, metrics.WebhookStatusSuccess)
 					if err := canaryController.ScaleFromZero(canary); err != nil {
 						c.recordEventErrorf(canary, "%v", err)
 						return false
@@ -89,6 +94,7 @@ func (c *Controller) runConfirmPromotionHooks(canary *flaggerv1.Canary, canaryCo
 						c.logger.With("canary", fmt.Sprintf("%s.%s", canary.Name, canary.Namespace)).Errorf("%v", err)
 					}
 					c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseWaitingPromotion)
+					c.recorder.SetWebhookConfirmPromotion(canary, metrics.WebhookStatusFailed)
 					c.recordEventWarningf(canary, "Halt %s.%s advancement waiting for promotion approval %s",
 						canary.Name, canary.Namespace, webhook.Name)
 					if !webhook.MuteAlert {
@@ -97,6 +103,7 @@ func (c *Controller) runConfirmPromotionHooks(canary *flaggerv1.Canary, canaryCo
 				}
 				return false
 			} else {
+				c.recorder.SetWebhookConfirmPromotion(canary, metrics.WebhookStatusSuccess)
 				c.recordEventInfof(canary, "Confirm-promotion check %s passed", webhook.Name)
 			}
 		}
@@ -107,11 +114,6 @@ func (c *Controller) runConfirmPromotionHooks(canary *flaggerv1.Canary, canaryCo
 func (c *Controller) runPreRolloutHooks(canary *flaggerv1.Canary) bool {
 	for _, webhook := range canary.GetAnalysis().Webhooks {
 		if webhook.Type == flaggerv1.PreRolloutHook {
-			if canary.Status.CanaryWeight == 0 && canary.Status.Iterations == 0 {
-				c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseWaiting)
-			} else {
-				c.recorder.SetPhase(canary, flaggerv1.CanaryPhaseProgressing)
-			}
 			err := CallWebhook(canary.Name, canary.Namespace, flaggerv1.CanaryPhaseProgressing, webhook)
 			if err != nil {
 				c.recordEventWarningf(canary, "Halt %s.%s advancement pre-rollout check %s failed %v",
